@@ -30,6 +30,28 @@ inputs:
     required: false
     default: ""
 runs:
-  using: "python"
-  main: "run_papermill.py"
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
 
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r ${{ github.action_path }}/requirements.txt
+      shell: bash
+
+    - name: Run Papermill job
+      run: |
+        python ${{ github.action_path }}/run_papermill.py
+      shell: bash
+      env:
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_REF: ${{ inputs.ref }}
+        INPUT_API_URL: ${{ inputs.api_url }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_NOTEBOOK_DIRS: ${{ inputs.notebook_dirs }}
+        INPUT_POLL_INTERVAL: ${{ inputs.poll_interval }}
+        INPUT_MAX_WAIT: ${{ inputs.max_wait }}
