@@ -1,5 +1,5 @@
-name: "Run Papermill Notebook"
-description: "Trigger a Papermill job on a JupyterHub/Binder instance."
+name: "Notebooks Runner"
+description: "Trigger a Papermill job on a JupyterHub instance."
 author: "Jupyter4NFDI"
 
 inputs:
@@ -13,7 +13,7 @@ inputs:
   api_url:
     description: "JupyterHub API URL to trigger job"
     required: false
-    default: "https://jupyter-jsc-dev1.fz-juelich.de/hub/api/job"
+    default: "https://hub.nfdi-jupyter.de/hub/api/job"
   token:
     description: "JupyterHub API token"
     required: true
