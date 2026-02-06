@@ -11,12 +11,24 @@ inputs:
     required: false
     default: "HEAD"
   api_url:
-    description: "JupyterHub/Binder API URL to trigger job"
-    required: true
+    description: "JupyterHub API URL to trigger job"
+    required: false
+    default: "https://jupyter-jsc-dev1.fz-juelich.de/hub/api/job"
   token:
     description: "JupyterHub API token"
     required: true
-
+  poll_interval:
+    description: "Polling interval in seconds"
+    required: false
+    default: "10"
+  max_wait:
+    description: "Maximum wait time in seconds"
+    required: false
+    default: "3600"
+  notebook_dirs:
+    description: "Optional list of notebook directories (JSON array or comma-separated)"
+    required: false
+    default: ""
 runs:
   using: "python"
   main: "run_papermill.py"

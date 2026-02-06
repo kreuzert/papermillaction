@@ -1,18 +1,39 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
-import json
+import time
 import requests
 
-def main():
-    repo = os.environ.get("INPUT_REPO")
-    ref = os.environ.get("INPUT_REF", "HEAD")
-    token = os.environ.get("INPUT_TOKEN")
-    api_url = os.environ.get("INPUT_API_URL", "https://jupyter-jsc-dev1.fz-juelich.de/hub/api/job")
+POLL_INTERVAL = int(os.environ.get("INPUT_POLL_INTERVAL", 10))
+MAX_WAIT = int(os.environ.get("INPUT_MAX_WAIT", 3600))  # seconds
 
-    if not all([repo, token, api_url]):
-        print("ERROR: Missing required inputs: repo, api_url, or token")
-        sys.exit(1)
+def parse_notebook_dirs(value):
+    if not value:
+        return []
+
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, list):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def main():
+    repo = os.environ["INPUT_REPO"]
+    ref = os.environ.get("INPUT_REF", "HEAD")
+    api_url = os.environ["INPUT_API_URL"].rstrip("/")
+    token = os.environ["INPUT_TOKEN"]
+    notebook_dirs_raw = os.environ.get("INPUT_NOTEBOOK_DIRS", "")
+    notebook_dirs = parse_notebook_dirs(notebook_dirs_raw)
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Content-Type": "application/json",
+    }
 
     payload = {
         "user_options": {
@@ -20,37 +41,61 @@ def main():
             "repo2docker": {
                 "repotype": "gh",
                 "repourl": repo,
-                "reporef": ref
+                "reporef": ref,
             }
         }
     }
+    
+    if notebook_dirs:
+        payload["notebook_dirs"] = notebook_dirs
 
-    resp = requests.post(
-        api_url,
-        headers={"Authorization": f"token {token}"},
-        json=payload
-    )
+    print(f"Triggering Papermill job for {repo}@{ref}")
+    resp = requests.post(api_url, headers=headers, json=payload)
     resp.raise_for_status()
-    data = resp.json()
 
+    job_url = resp.headers.get("Location")
+    if not job_url:
+        print("Missing Location header in response")
+        sys.exit(1)
+
+    # Location may be relative
+    if job_url.startswith("/"):
+        job_url = api_url.split("/hub/api/job")[0] + job_url
+
+    print(f"📍 Job URL: {job_url}")
+
+    start = time.time()
+
+    while True:
+        if time.time() - start > MAX_WAIT:
+            print("Timeout waiting for Papermill job")
+            sys.exit(1)
+
+        time.sleep(POLL_INTERVAL)
+
+        status_resp = requests.get(job_url, headers=headers)
+        status_resp.raise_for_status()
+        data = status_resp.json()
+
+        status = data.get("status")
+        print(f"⏳ Job status: {status}")
+
+        if status == "stopped":
+            break
+
+    # ---- Job finished: analyze result ----
     exit_code = data.get("exit_code", 1)
     logs = data.get("logs", [])
 
-    # Format logs nicely
-    formatted_logs = []
+    print("\n========== PAPERMILL LOGS ==========")
     for line in logs:
-        line = line.replace("\\n", "\n").replace("\\u2588", "█")
-        formatted_logs.append(line)
-    print("========== PAPERMILL LOGS ==========")
-    print("\n".join(formatted_logs))
+        print(line.replace("\\n", "\n").replace("\\u2588", "█"))
     print("===================================")
 
     if exit_code != 0:
-        print(f"Papermill job failed with exit_code={exit_code}")
+        print(f"Papermill job failed (exit_code={exit_code})")
         sys.exit(exit_code)
-    else:
-        print("Papermill job completed successfully.")
 
+    print("Papermill job completed successfully")
 if __name__ == "__main__":
     main()
-
