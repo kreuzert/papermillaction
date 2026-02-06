@@ -33,6 +33,7 @@ def main():
     headers = {
         "Authorization": f"token {token}",
         "Content-Type": "application/json",
+        "Connection": "close",
     }
 
     payload = {
@@ -58,11 +59,7 @@ def main():
         print("Missing Location header in response")
         sys.exit(1)
 
-    # Location may be relative
-    if job_url.startswith("/"):
-        job_url = api_url.split("/hub/api/job")[0] + job_url
-
-    print(f"📍 Job URL: {job_url}")
+    print(f"Job URL: {job_url}")
 
     start = time.time()
 
@@ -73,12 +70,12 @@ def main():
 
         time.sleep(POLL_INTERVAL)
 
-        status_resp = requests.get(job_url, headers=headers)
+        status_resp = requests.get(job_url, headers=headers, timeout=5)
         status_resp.raise_for_status()
         data = status_resp.json()
 
         status = data.get("status")
-        print(f"⏳ Job status: {status}")
+        print(f"Job status: {status}")
 
         if status == "stopped":
             break
