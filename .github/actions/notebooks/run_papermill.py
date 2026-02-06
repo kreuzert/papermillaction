@@ -67,8 +67,19 @@ def main():
         payload["notebook_dirs"] = notebook_dirs
 
     print(f"Triggering Papermill job for {repo}@{ref}")
-    resp = requests.post(api_url, headers=headers, json=payload)
-    resp.raise_for_status()
+    for i in range(5):
+        try:
+            resp = requests.post(api_url, headers=headers, json=payload, timeout=10)
+            resp.raise_for_status()
+            break
+        except Exception as e:
+            print(f"Error triggering Papermill job: {e}")
+            if i == 4:
+                print(
+                    "Failed to trigger Papermill job after multiple attempts, aborting"
+                )
+                sys.exit(1)
+            time.sleep(60)
 
     job_url = resp.headers.get("Location")
     if not job_url:
