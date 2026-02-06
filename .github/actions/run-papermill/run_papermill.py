@@ -78,7 +78,7 @@ def main():
     print(f"Job URL: {job_url}")
 
     start = time.time()
-
+    fail_counter = 0
     while True:
         if time.time() - start > MAX_WAIT:
             print("Timeout waiting for Papermill job")
@@ -86,8 +86,19 @@ def main():
 
         time.sleep(POLL_INTERVAL)
 
-        status_resp = requests.get(job_url, headers=headers, timeout=5)
-        status_resp.raise_for_status()
+        try:
+            status_resp = requests.get(job_url, headers=headers, timeout=10)
+            status_resp.raise_for_status()
+        except Exception as e:
+            print(f"Error fetching job status: {e}")
+            fail_counter += 1
+            if fail_counter >= 5:
+                print("Too many consecutive failures fetching job status, aborting")
+                sys.exit(1)
+            continue
+        else:
+            fail_counter = 0
+
         data = status_resp.json()
 
         status = data.get("status")
