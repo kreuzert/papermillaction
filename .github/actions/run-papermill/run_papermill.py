@@ -3,10 +3,26 @@ import json
 import os
 import sys
 import time
+
 import requests
 
 POLL_INTERVAL = int(os.environ.get("INPUT_POLL_INTERVAL", 10))
 MAX_WAIT = int(os.environ.get("INPUT_MAX_WAIT", 3600))  # seconds
+
+
+def parse_logs_as_json(logs):
+    """
+    Try to reconstruct logs into a JSON object.
+    Returns (parsed_json, raw_text)
+    """
+    raw_text = "\n".join(logs)
+
+    try:
+        parsed = json.loads(raw_text)
+        return parsed, raw_text
+    except json.JSONDecodeError:
+        return None, raw_text
+
 
 def parse_notebook_dirs(value):
     if not value:
@@ -43,10 +59,10 @@ def main():
                 "repotype": "gh",
                 "repourl": repo,
                 "reporef": ref,
-            }
+            },
         }
     }
-    
+
     if notebook_dirs:
         payload["notebook_dirs"] = notebook_dirs
 
@@ -81,18 +97,40 @@ def main():
             break
 
     # ---- Job finished: analyze result ----
-    exit_code = data.get("exit_code", 1)
     logs = data.get("logs", [])
 
+    parsed_logs, raw_logs = parse_logs_as_json(logs)
+
     print("\n========== PAPERMILL LOGS ==========")
-    for line in logs:
-        print(line.replace("\\n", "\n").replace("\\u2588", "█"))
+
+    if parsed_logs:
+        print(json.dumps(parsed_logs, indent=2))
+
+        # Prefer exitCode from logs if present
+        exit_code = parsed_logs.get("exitCode", data.get("exit_code", 1))
+    else:
+        # Fallback: plain text logs
+        print(raw_logs.replace("\\n", "\n").replace("\\u2588", "█"))
+        exit_code = data.get("exit_code", 1)
+
     print("===================================")
 
     if exit_code != 0:
-        print(f"Papermill job failed (exit_code={exit_code})")
+        print(f"Papermill job failed (exitCode={exit_code})")
+
+        # Optional: detailed per-notebook errors
+        if parsed_logs and "results" in parsed_logs:
+            for result in parsed_logs["results"]:
+                if result.get("exitCode", 0) != 0:
+                    print(
+                        f"::error file={result.get('notebook','unknown')}::"
+                        f"{result.get('stdout','')}"
+                    )
+
         sys.exit(exit_code)
 
     print("Papermill job completed successfully")
+
+
 if __name__ == "__main__":
     main()
