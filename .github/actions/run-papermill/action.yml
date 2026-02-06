@@ -1,0 +1,23 @@
+name: "Run Papermill Notebook"
+description: "Trigger a Papermill job on a JupyterHub/Binder instance."
+author: "Jupyter4NFDI"
+
+inputs:
+  repo:
+    description: "Repository to run Papermill on (org/repo)"
+    required: true
+  ref:
+    description: "Git ref or branch"
+    required: false
+    default: "HEAD"
+  api_url:
+    description: "JupyterHub/Binder API URL to trigger job"
+    required: true
+  token:
+    description: "JupyterHub API token"
+    required: true
+
+runs:
+  using: "python"
+  main: "run_papermill.py"
+
